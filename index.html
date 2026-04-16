@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PerfecTemp — BLE Probe Tool</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --surface: #1a1d24;
+      --surface-2: #242830;
+      --border: #2e3340;
+      --text: #e4e4e7;
+      --text-dim: #8b8d94;
+      --accent: #f59e0b;
+      --accent-dim: #b45309;
+      --blue: #3b82f6;
+      --red: #ef4444;
+      --green: #22c55e;
+      --radius: 10px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    header h1 span { color: var(--accent); }
+
+    .connection-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-dim);
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: var(--surface-2);
+    }
+
+    .connection-badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+
+    .connection-badge.connected .dot { background: var(--green); }
+    .connection-badge.scanning .dot { background: var(--blue); animation: pulse 1s infinite; }
+    .connection-badge.connected { color: var(--green); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab {
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    main { padding: 24px; max-width: 960px; margin: 0 auto; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* Connect panel */
+    .connect-hero {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .connect-hero h2 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .connect-hero p {
+      color: var(--text-dim);
+      font-size: 14px;
+      margin-bottom: 32px;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.5;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: var(--radius);
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+      padding: 12px 32px;
+      font-size: 15px;
+    }
+
+    .btn-primary:hover { background: #fbbf24; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: var(--surface-2);
+      color: var(--text);
+      padding: 8px 16px;
+      font-size: 13px;
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover { background: var(--border); }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--red);
+      padding: 8px 16px;
+      font-size: 13px;
+      border: 1px solid var(--red);
+    }
+
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.1); }
+
+    /* Discovery panel */
+    .gatt-tree {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .service-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .service-header {
+      padding: 12px 16px;
+      background: var(--surface-2);
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .service-header .uuid {
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 400;
+    }
+
+    .char-row {
+      padding: 10px 16px 10px 32px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .char-info { flex: 1; min-width: 0; }
+
+    .char-name {
+      font-weight: 500;
+      margin-bottom: 2px;
+      word-break: break-all;
+    }
+
+    .char-props {
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .char-props span {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: var(--surface-2);
+    }
+
+    .char-value {
+      font-size: 12px;
+      color: var(--accent);
+      text-align: right;
+      min-width: 120px;
+      word-break: break-all;
+    }
+
+    .char-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+    .char-actions button {
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-dim);
+      font-size: 14px;
+    }
+
+    /* Live panel */
+    .temp-display {
+      text-align: center;
+      padding: 32px 20px 24px;
+    }
+
+    .temp-value {
+      font-size: 80px;
+      font-weight: 700;
+      letter-spacing: -3px;
+      font-variant-numeric: tabular-nums;
+      transition: color 0.5s;
+    }
+
+    .temp-unit {
+      font-size: 28px;
+      font-weight: 400;
+      color: var(--text-dim);
+      margin-left: 4px;
+    }
+
+    .temp-rate {
+      font-size: 16px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .temp-rate.rising { color: var(--accent); }
+    .temp-rate.falling { color: var(--blue); }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 18px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chart-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .chart-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-dim);
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 200px !important;
+      display: block;
+    }
+
+    /* Log panel */
+    .log-controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .log-output {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      max-height: 500px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .log-line { padding: 1px 0; }
+    .log-line .ts { color: var(--text-dim); }
+    .log-line .hex { color: var(--blue); }
+    .log-line .decoded { color: var(--accent); }
+    .log-line .info { color: var(--green); }
+    .log-line .error { color: var(--red); }
+
+    /* Settings panel */
+    .settings-group {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .settings-group h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+
+    .setting-row + .setting-row {
+      border-top: 1px solid var(--border);
+    }
+
+    .setting-label {
+      font-size: 13px;
+    }
+
+    .setting-label small {
+      display: block;
+      color: var(--text-dim);
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    select, input[type="number"], input[type="text"] {
+      font-family: inherit;
+      font-size: 13px;
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      width: 120px;
+    }
+
+    select:focus, input:focus { outline: 1px solid var(--accent); }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .temp-value { font-size: 56px; }
+      header { padding: 12px 16px; }
+      main { padding: 16px; }
+      .tabs { padding: 0 16px; }
+      .char-row { flex-wrap: wrap; }
+      .char-actions { width: 100%; margin-top: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Perfec<span>Temp</span></h1>
+  <div class="connection-badge" id="connBadge">
+    <div class="dot"></div>
+    <span id="connLabel">Disconnected</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-panel="connect">Connect</div>
+  <div class="tab" data-panel="discovery">Discovery</div>
+  <div class="tab" data-panel="live">Live</div>
+  <div class="tab" data-panel="log">Raw Log</div>
+  <div class="tab" data-panel="settings">Settings</div>
+</div>
+
+<main>
+  <!-- Connect Panel -->
+  <div class="panel active" id="panel-connect">
+    <div class="connect-hero">
+      <h2>Connect Your Probe</h2>
+      <p>Remove the probe from its charging dock to start BLE advertising, then click Connect. Chrome will show a device picker.</p>
+      <button class="btn-primary" id="btnConnect">Connect</button>
+      <button class="btn-danger" id="btnDisconnect" style="display:none; margin-left: 12px;">Disconnect</button>
+      <div id="connectStatus" style="margin-top: 16px; color: var(--text-dim); font-size: 13px;"></div>
+    </div>
+  </div>
+
+  <!-- Discovery Panel -->
+  <div class="panel" id="panel-discovery">
+    <div class="gatt-tree" id="gattTree">
+      <div class="empty-state">Connect to a probe to browse its GATT services.</div>
+    </div>
+  </div>
+
+  <!-- Live Panel -->
+  <div class="panel" id="panel-live">
+    <div class="temp-display">
+      <div class="temp-value" id="tempValue">--.-</div>
+      <div class="temp-rate" id="tempRate"></div>
+    </div>
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="metric-label">Peak</div>
+        <div class="metric-value" id="metricPeak">--</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Rate</div>
+        <div class="metric-value" id="metricRate">--</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Readings</div>
+        <div class="metric-value" id="metricCount">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Duration</div>
+        <div class="metric-value" id="metricDuration">0:00</div>
+      </div>
+    </div>
+    <div class="chart-container">
+      <div class="chart-header">
+        <span class="chart-title">Temperature over time</span>
+        <button class="btn-secondary" id="btnClearChart">Clear</button>
+      </div>
+      <canvas id="tempChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Raw Log Panel -->
+  <div class="panel" id="panel-log">
+    <div class="log-controls">
+      <button class="btn-secondary" id="btnClearLog">Clear Log</button>
+      <button class="btn-secondary" id="btnExportLog">Export CSV</button>
+    </div>
+    <div class="log-output" id="logOutput">Waiting for data...</div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="panel" id="panel-settings">
+    <div class="settings-group">
+      <h3>Data Decoding</h3>
+      <div class="setting-row">
+        <div class="setting-label">
+          Byte order
+          <small>How multi-byte values are read</small>
+        </div>
+        <select id="settingEndian">
+          <option value="little">Little-endian</option>
+          <option value="big">Big-endian</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          Scale factor
+          <small>Raw value is divided by this (10 = tenths of deg C)</small>
+        </div>
+        <input type="number" id="settingScale" value="10" min="1" max="1000" step="1">
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          Offset (deg C)
+          <small>Added after scaling for calibration</small>
+        </div>
+        <input type="number" id="settingOffset" value="0" step="0.1">
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          Data type
+          <small>How to interpret raw bytes</small>
+        </div>
+        <select id="settingDataType">
+          <option value="ascii">ASCII text (CXL001)</option>
+          <option value="int16">Signed int16</option>
+          <option value="uint16">Unsigned uint16</option>
+          <option value="int16multi">int16 x N (multi-probe)</option>
+        </select>
+      </div>
+    </div>
+    <div class="settings-group">
+      <h3>Display</h3>
+      <div class="setting-row">
+        <div class="setting-label">Temperature unit</div>
+        <select id="settingUnit">
+          <option value="C">Celsius (deg C)</option>
+          <option value="F">Fahrenheit (deg F)</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          EMA alpha
+          <small>Smoothing factor (0 = max smooth, 1 = no smooth)</small>
+        </div>
+        <input type="number" id="settingAlpha" value="0.15" min="0.01" max="1" step="0.01">
+      </div>
+    </div>
+    <div class="settings-group">
+      <h3>Name Filter</h3>
+      <div class="setting-row">
+        <div class="setting-label">
+          BLE name prefix
+          <small>Filter for device picker (e.g., BBQ, iBBQ, Probe)</small>
+        </div>
+        <input type="text" id="settingNamePrefix" value="" style="width:160px;" placeholder="Leave empty for all">
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let device = null;
+let server = null;
+let subscribedChars = new Map(); // uuid -> { char, handler }
+let readings = [];      // { ts, raw, tempC, smoothedC }
+let smoothedTemp = null;
+let peakTemp = -Infinity;
+let startTime = null;
+let logLines = [];
+let chartPoints = [];   // { ts, temp }
+const MAX_CHART_POINTS = 1800; // 30 min at 1/s
+
+// ── Settings ───────────────────────────────────────────────────────
+let settings = {
+  endian: 'little',
+  scale: 10,
+  offset: 0,
+  dataType: 'ascii',
+  unit: 'C',
+  alpha: 0.15,
+  namePrefix: '',
+};
+
+function loadSettings() {
+  try {
+    const saved = localStorage.getItem('perfectemp_settings');
+    if (saved) Object.assign(settings, JSON.parse(saved));
+  } catch { /* ignore corrupt storage */ }
+  document.getElementById('settingEndian').value = settings.endian;
+  document.getElementById('settingScale').value = settings.scale;
+  document.getElementById('settingOffset').value = settings.offset;
+  document.getElementById('settingDataType').value = settings.dataType;
+  document.getElementById('settingUnit').value = settings.unit;
+  document.getElementById('settingAlpha').value = settings.alpha;
+  document.getElementById('settingNamePrefix').value = settings.namePrefix;
+}
+
+function readSettings() {
+  settings.endian = document.getElementById('settingEndian').value;
+  settings.scale = parseFloat(document.getElementById('settingScale').value) || 10;
+  settings.offset = parseFloat(document.getElementById('settingOffset').value) || 0;
+  settings.dataType = document.getElementById('settingDataType').value;
+  settings.unit = document.getElementById('settingUnit').value;
+  settings.alpha = parseFloat(document.getElementById('settingAlpha').value) || 0.15;
+  settings.namePrefix = document.getElementById('settingNamePrefix').value.trim();
+  localStorage.setItem('perfectemp_settings', JSON.stringify(settings));
+}
+
+// ── Event binding ──────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
+  });
+});
+
+document.getElementById('btnConnect').addEventListener('click', connectProbe);
+document.getElementById('btnDisconnect').addEventListener('click', disconnectProbe);
+document.getElementById('btnClearChart').addEventListener('click', clearChart);
+document.getElementById('btnClearLog').addEventListener('click', clearLog);
+document.getElementById('btnExportLog').addEventListener('click', exportLog);
+
+// Save settings on any change
+document.querySelectorAll('#panel-settings select, #panel-settings input').forEach(function(el) {
+  el.addEventListener('change', readSettings);
+});
+
+// ── Connection ─────────────────────────────────────────────────────
+function setConnectionState(state) {
+  var badge = document.getElementById('connBadge');
+  var label = document.getElementById('connLabel');
+  badge.className = 'connection-badge ' + state;
+  var labels = {
+    disconnected: 'Disconnected',
+    scanning: 'Scanning...',
+    connected: 'Connected',
+  };
+  label.textContent = labels[state] || state;
+
+  document.getElementById('btnConnect').style.display = state === 'connected' ? 'none' : '';
+  document.getElementById('btnDisconnect').style.display = state === 'connected' ? '' : 'none';
+}
+
+async function connectProbe() {
+  if (!navigator.bluetooth) {
+    setStatus('Web Bluetooth not supported. Use Chrome on desktop or Android.', true);
+    return;
+  }
+
+  intentionalDisconnect = false;
+  reconnectAttempts = 0;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  setConnectionState('scanning');
+  setStatus('Opening device picker...');
+
+  try {
+    var requestOpts = { optionalServices: [] };
+
+    if (settings.namePrefix) {
+      requestOpts.filters = [{ namePrefix: settings.namePrefix }];
+    } else {
+      requestOpts.acceptAllDevices = true;
+    }
+
+    // Request all known thermometer service UUIDs
+    requestOpts.optionalServices = [
+      // CXL001 "BBQ" probe - custom vendor service
+      '18424398-7cbc-11e9-8f9e-2a86e4085a59',
+      // Standard services
+      0x180A, // Device Info
+      0x180F, // Battery
+      // iBBQ protocol (fallback)
+      0xFFF0,
+      '0000fff0-0000-1000-8000-00805f9b34fb',
+      // Other common thermometer services
+      0xFFE0,
+      '0000ffe0-0000-1000-8000-00805f9b34fb',
+      '2899fe00-c277-48a8-91cb-b29ab0f01ac4',
+    ];
+
+    device = await navigator.bluetooth.requestDevice(requestOpts);
+    setStatus('Selected: ' + (device.name || device.id));
+
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+
+    await connectAndInit();
+
+  } catch (err) {
+    setConnectionState('disconnected');
+    if (err.name === 'NotFoundError') {
+      setStatus('No device selected.');
+    } else {
+      setStatus('Error: ' + err.message, true);
+      addLog('error', err.message);
+    }
+  }
+}
+
+var reconnectAttempts = 0;
+var maxReconnectAttempts = 20;
+var intentionalDisconnect = false;
+var reconnectTimer = null;
+
+async function connectAndInit() {
+  server = await device.gatt.connect();
+  reconnectAttempts = 0;
+  setConnectionState('connected');
+  setStatus('Connected to ' + (device.name || device.id));
+  addLog('info', 'Connected to ' + (device.name || device.id));
+  subscribedChars.clear();
+  await discoverServices();
+}
+
+function onDisconnected() {
+  subscribedChars.clear();
+
+  if (intentionalDisconnect) {
+    setConnectionState('disconnected');
+    setStatus('Disconnected.');
+    return;
+  }
+
+  addLog('info', 'Connection lost. Attempting reconnect...');
+  attemptReconnect();
+}
+
+function attemptReconnect() {
+  if (!device || intentionalDisconnect) return;
+  if (reconnectAttempts >= maxReconnectAttempts) {
+    setConnectionState('disconnected');
+    setStatus('Reconnect failed after ' + maxReconnectAttempts + ' attempts. Click Connect to retry.');
+    addLog('error', 'Reconnect gave up after ' + maxReconnectAttempts + ' attempts.');
+    return;
+  }
+
+  reconnectAttempts++;
+  // Exponential backoff: 1s, 2s, 4s, 8s, ... capped at 30s
+  var delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000);
+  setConnectionState('scanning');
+  setStatus('Reconnecting (attempt ' + reconnectAttempts + '/' + maxReconnectAttempts + ') in ' + (delay / 1000).toFixed(0) + 's...');
+
+  reconnectTimer = setTimeout(async function() {
+    try {
+      addLog('info', 'Reconnect attempt ' + reconnectAttempts + '...');
+      await connectAndInit();
+    } catch (err) {
+      addLog('error', 'Reconnect attempt ' + reconnectAttempts + ' failed: ' + err.message);
+      attemptReconnect();
+    }
+  }, delay);
+}
+
+function disconnectProbe() {
+  intentionalDisconnect = true;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (device && device.gatt.connected) {
+    device.gatt.disconnect();
+  }
+  subscribedChars.clear();
+  reconnectAttempts = 0;
+  setConnectionState('disconnected');
+  setStatus('Disconnected.');
+}
+
+function setStatus(msg, isError) {
+  var el = document.getElementById('connectStatus');
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--red)' : 'var(--text-dim)';
+}
+
+// ── GATT Discovery ─────────────────────────────────────────────────
+var KNOWN_SERVICES = {
+  '00001800-0000-1000-8000-00805f9b34fb': 'Generic Access',
+  '00001801-0000-1000-8000-00805f9b34fb': 'Generic Attribute',
+  '0000180a-0000-1000-8000-00805f9b34fb': 'Device Information',
+  '0000180f-0000-1000-8000-00805f9b34fb': 'Battery Service',
+  '0000ffe0-0000-1000-8000-00805f9b34fb': 'Custom (0xFFE0)',
+  '0000fff0-0000-1000-8000-00805f9b34fb': 'iBBQ Service (0xFFF0)',
+  '2899fe00-c277-48a8-91cb-b29ab0f01ac4': 'Probe Service (2899)',
+  '18424398-7cbc-11e9-8f9e-2a86e4085a59': 'CXL001 Vendor Service',
+};
+
+var KNOWN_CHARS = {
+  '00002a19-0000-1000-8000-00805f9b34fb': 'Battery Level',
+  '00002a29-0000-1000-8000-00805f9b34fb': 'Manufacturer Name',
+  '00002a24-0000-1000-8000-00805f9b34fb': 'Model Number',
+  '00002a25-0000-1000-8000-00805f9b34fb': 'Serial Number',
+  '00002a26-0000-1000-8000-00805f9b34fb': 'Firmware Revision',
+  '00002a27-0000-1000-8000-00805f9b34fb': 'Hardware Revision',
+  '00002a28-0000-1000-8000-00805f9b34fb': 'Software Revision',
+  // iBBQ characteristics
+  '0000fff1-0000-1000-8000-00805f9b34fb': 'iBBQ Settings Result (NOTIFY)',
+  '0000fff2-0000-1000-8000-00805f9b34fb': 'iBBQ Login (WRITE)',
+  '0000fff3-0000-1000-8000-00805f9b34fb': 'iBBQ History (NOTIFY)',
+  '0000fff4-0000-1000-8000-00805f9b34fb': 'iBBQ Realtime Temp (NOTIFY)',
+  '0000fff5-0000-1000-8000-00805f9b34fb': 'iBBQ Settings (WRITE)',
+  // 2899 family characteristics
+  '28998e03-c277-48a8-91cb-b29ab0f01ac4': 'Probe Main',
+  '28998e10-c277-48a8-91cb-b29ab0f01ac4': 'Probe Sensor 1',
+  '28998e11-c277-48a8-91cb-b29ab0f01ac4': 'Probe Sensor 2',
+};
+
+// ── iBBQ Protocol Constants ────────────────────────────────────────
+var IBBQ = {
+  SERVICE:       '0000fff0-0000-1000-8000-00805f9b34fb',
+  SETTINGS_RESULT: '0000fff1-0000-1000-8000-00805f9b34fb',
+  LOGIN:         '0000fff2-0000-1000-8000-00805f9b34fb',
+  HISTORY:       '0000fff3-0000-1000-8000-00805f9b34fb',
+  REALTIME:      '0000fff4-0000-1000-8000-00805f9b34fb',
+  SETTINGS:      '0000fff5-0000-1000-8000-00805f9b34fb',
+  // Login credentials (fixed bytes)
+  CREDENTIALS: new Uint8Array([0x21, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0xb8, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00]),
+  // Enable realtime data command
+  CMD_REALTIME_ON: new Uint8Array([0x0b, 0x01, 0x00, 0x00, 0x00, 0x00]),
+  // Set units to Celsius
+  CMD_UNITS_C: new Uint8Array([0x02, 0x00, 0x00, 0x00, 0x00, 0x00]),
+  // Request battery level
+  CMD_BATTERY: new Uint8Array([0x08, 0x24, 0x00, 0x00, 0x00, 0x00]),
+};
+
+var detectedProtocol = null; // 'ibbq', '2899', or null
+
+async function discoverServices() {
+  var container = document.getElementById('gattTree');
+  // Clear previous content
+  while (container.firstChild) container.removeChild(container.firstChild);
+
+  try {
+    var services = await server.getPrimaryServices();
+    addLog('info', 'Found ' + services.length + ' services');
+
+    for (var i = 0; i < services.length; i++) {
+      var service = services[i];
+      var svcUuid = service.uuid;
+      var svcName = KNOWN_SERVICES[svcUuid] || 'Unknown Service';
+      addLog('info', 'Service: ' + svcName + ' [' + shortUuid(svcUuid) + ']');
+
+      var block = document.createElement('div');
+      block.className = 'service-block';
+
+      var header = document.createElement('div');
+      header.className = 'service-header';
+      var nameSpan = document.createElement('span');
+      nameSpan.textContent = svcName;
+      var uuidSpan = document.createElement('span');
+      uuidSpan.className = 'uuid';
+      uuidSpan.textContent = shortUuid(svcUuid);
+      header.appendChild(nameSpan);
+      header.appendChild(uuidSpan);
+      block.appendChild(header);
+
+      try {
+        var chars = await service.getCharacteristics();
+        for (var j = 0; j < chars.length; j++) {
+          var row = buildCharRow(chars[j]);
+          block.appendChild(row);
+          addLog('info', '  Char: ' + shortUuid(chars[j].uuid) + ' [' + propsList(chars[j].properties) + ']');
+        }
+      } catch (e) {
+        var errRow = document.createElement('div');
+        errRow.className = 'char-row';
+        var errSpan = document.createElement('span');
+        errSpan.style.color = 'var(--red)';
+        errSpan.textContent = 'Could not read characteristics: ' + e.message;
+        errRow.appendChild(errSpan);
+        block.appendChild(errRow);
+      }
+
+      container.appendChild(block);
+    }
+
+    // Switch to discovery tab
+    document.querySelector('.tab[data-panel="discovery"]').click();
+
+    // Auto-detect known protocols
+    await detectProtocol(services);
+
+  } catch (err) {
+    addLog('error', 'Service discovery failed: ' + err.message);
+    var errDiv = document.createElement('div');
+    errDiv.className = 'empty-state';
+    errDiv.style.color = 'var(--red)';
+    errDiv.textContent = 'Discovery failed: ' + err.message;
+    container.appendChild(errDiv);
+  }
+}
+
+// ── Protocol Auto-Detection ────────────────────────────────────────
+async function detectProtocol(services) {
+  var serviceUuids = services.map(function(s) { return s.uuid; });
+  addLog('info', 'Detecting protocol from services: ' + serviceUuids.map(shortUuid).join(', '));
+
+  // Check for CXL001 (ASCII protocol)
+  var CXL_SERVICE = '18424398-7cbc-11e9-8f9e-2a86e4085a59';
+  var CXL_CHAR = '772ae377-b3d2-ff8e-1042-5481d1e03456';
+  if (serviceUuids.indexOf(CXL_SERVICE) !== -1) {
+    addLog('info', '>>> CXL001 probe detected! Auto-subscribing...');
+    detectedProtocol = 'cxl001';
+    // Force ASCII data type
+    settings.dataType = 'ascii';
+    document.getElementById('settingDataType').value = 'ascii';
+    readSettings();
+    await cxlInit(CXL_SERVICE, CXL_CHAR);
+    return;
+  }
+
+  // Check for iBBQ
+  if (serviceUuids.indexOf(IBBQ.SERVICE) !== -1) {
+    addLog('info', '>>> iBBQ service detected! Attempting login...');
+    detectedProtocol = 'ibbq';
+    await ibbqInit();
+    return;
+  }
+
+  // Check for 2899 family
+  if (serviceUuids.indexOf('2899fe00-c277-48a8-91cb-b29ab0f01ac4') !== -1) {
+    addLog('info', '>>> 2899 probe service detected!');
+    detectedProtocol = '2899';
+    return;
+  }
+
+  addLog('info', 'No known protocol detected. Use Discovery tab to explore manually.');
+  detectedProtocol = null;
+}
+
+async function cxlInit(serviceUuid, charUuid) {
+  try {
+    var svc = await server.getPrimaryService(serviceUuid);
+    var char = await svc.getCharacteristic(charUuid);
+
+    char.addEventListener('characteristicvaluechanged', function(event) {
+      var val = event.target.value;
+      var hex = bufToHex(val.buffer);
+
+      // Decode ASCII
+      var bytes = new Uint8Array(val.buffer, val.byteOffset, val.byteLength);
+      var str = '';
+      for (var i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+
+      var tempC = parseFloat(str.replace(/^[^0-9.\-]+/, ''));
+
+      addLog('hex', 'CXL001: ' + hex + ' -> "' + str + '" = ' + (isNaN(tempC) ? '?' : tempC.toFixed(1) + '\u00B0C'));
+
+      if (!isNaN(tempC)) {
+        processReading(tempC + settings.offset, val);
+      }
+    });
+
+    await char.startNotifications();
+    addLog('info', '>>> CXL001 streaming! Notifications every ~1.5s.');
+    setStatus('CXL001 connected - receiving temperature data');
+
+    // Auto-switch to live tab
+    document.querySelector('.tab[data-panel="live"]').click();
+
+  } catch (e) {
+    addLog('error', 'CXL001 init failed: ' + e.message);
+    detectedProtocol = null;
+  }
+}
+
+async function ibbqInit() {
+  try {
+    var svc = await server.getPrimaryService(IBBQ.SERVICE);
+
+    // Step 1: Subscribe to settings result (0xFFF1) for battery responses
+    var settingsChar = await svc.getCharacteristic(IBBQ.SETTINGS_RESULT);
+    settingsChar.addEventListener('characteristicvaluechanged', function(event) {
+      var val = event.target.value;
+      var hex = bufToHex(val.buffer);
+      addLog('hex', 'iBBQ settings: ' + hex);
+
+      // Check if battery response (first byte = 0x24)
+      if (val.byteLength >= 5 && val.getUint8(0) === 0x24) {
+        var current = val.getUint16(1, true);
+        var max = val.getUint16(3, true);
+        if (max === 0) max = 6550;
+        var pct = Math.min(100, Math.round((current / max) * 100));
+        addLog('info', 'Battery: ' + pct + '% (' + current + '/' + max + ')');
+      }
+    });
+    await settingsChar.startNotifications();
+    addLog('info', 'iBBQ: subscribed to settings result');
+
+    // Step 2: Subscribe to realtime temperature (0xFFF4)
+    var realtimeChar = await svc.getCharacteristic(IBBQ.REALTIME);
+    realtimeChar.addEventListener('characteristicvaluechanged', function(event) {
+      var val = event.target.value;
+      var hex = bufToHex(val.buffer);
+
+      // Decode all probe temperatures (each is int16 LE, tenths of C)
+      var probeCount = Math.floor(val.byteLength / 2);
+      var temps = [];
+      for (var i = 0; i < probeCount; i++) {
+        var raw = val.getInt16(i * 2, true);
+        var tempC = raw / 10;
+        temps.push(tempC);
+      }
+
+      // Use first valid probe for live display
+      var validTemp = null;
+      for (var j = 0; j < temps.length; j++) {
+        // 0x7FFF (3276.7) or very negative = no probe connected
+        if (temps[j] > -300 && temps[j] < 3000) {
+          validTemp = temps[j];
+          break;
+        }
+      }
+
+      addLog('hex', 'iBBQ temp: ' + hex + ' -> ' + temps.map(function(t) { return t.toFixed(1) + '\u00B0C'; }).join(', '));
+
+      if (validTemp !== null) {
+        processReading(validTemp + settings.offset, val);
+      }
+    });
+    await realtimeChar.startNotifications();
+    addLog('info', 'iBBQ: subscribed to realtime data');
+
+    // Step 3: Send login credentials
+    var loginChar = await svc.getCharacteristic(IBBQ.LOGIN);
+    await loginChar.writeValue(IBBQ.CREDENTIALS);
+    addLog('info', 'iBBQ: login credentials sent');
+
+    // Step 4: Send enable realtime data command
+    var settingsWriteChar = await svc.getCharacteristic(IBBQ.SETTINGS);
+    await settingsWriteChar.writeValue(IBBQ.CMD_REALTIME_ON);
+    addLog('info', 'iBBQ: realtime data enabled');
+
+    // Step 5: Set units to Celsius
+    await settingsWriteChar.writeValue(IBBQ.CMD_UNITS_C);
+    addLog('info', 'iBBQ: units set to Celsius');
+
+    // Step 6: Request battery level
+    await settingsWriteChar.writeValue(IBBQ.CMD_BATTERY);
+    addLog('info', 'iBBQ: battery level requested');
+
+    addLog('info', '>>> iBBQ initialization complete! Switch to Live tab.');
+    setStatus('iBBQ protocol active - receiving data');
+
+    // Auto-switch to live tab
+    document.querySelector('.tab[data-panel="live"]').click();
+
+  } catch (e) {
+    addLog('error', 'iBBQ init failed: ' + e.message);
+    addLog('info', 'Probe may not be iBBQ. Use Discovery tab to explore manually.');
+    detectedProtocol = null;
+  }
+}
+
+function buildCharRow(char) {
+  var uuid = char.uuid;
+  var name = KNOWN_CHARS[uuid] || shortUuid(uuid);
+  var props = char.properties;
+  var propStr = propsList(props);
+
+  var row = document.createElement('div');
+  row.className = 'char-row';
+
+  var info = document.createElement('div');
+  info.className = 'char-info';
+
+  var nameDiv = document.createElement('div');
+  nameDiv.className = 'char-name';
+  nameDiv.textContent = name;
+  info.appendChild(nameDiv);
+
+  var propsDiv = document.createElement('div');
+  propsDiv.className = 'char-props';
+  propStr.split(', ').forEach(function(p) {
+    var tag = document.createElement('span');
+    tag.textContent = p;
+    propsDiv.appendChild(tag);
+  });
+  info.appendChild(propsDiv);
+
+  var value = document.createElement('div');
+  value.className = 'char-value';
+  value.id = 'val-' + uuid.replace(/-/g, '');
+  value.textContent = '\u2014';
+
+  var actions = document.createElement('div');
+  actions.className = 'char-actions';
+
+  if (props.read) {
+    var readBtn = document.createElement('button');
+    readBtn.className = 'btn-secondary';
+    readBtn.textContent = 'Read';
+    readBtn.addEventListener('click', (function(c, v) {
+      return function() { readCharacteristic(c, v); };
+    })(char, value));
+    actions.appendChild(readBtn);
+  }
+
+  if (props.notify || props.indicate) {
+    var subBtn = document.createElement('button');
+    subBtn.className = 'btn-secondary';
+    subBtn.textContent = 'Subscribe';
+    subBtn.addEventListener('click', (function(c, v, b) {
+      return function() { subscribeCharacteristic(c, v, b); };
+    })(char, value, subBtn));
+    actions.appendChild(subBtn);
+  }
+
+  row.appendChild(info);
+  row.appendChild(value);
+  row.appendChild(actions);
+  return row;
+}
+
+async function readCharacteristic(char, valueEl) {
+  try {
+    var val = await char.readValue();
+    var hex = bufToHex(val.buffer);
+    valueEl.textContent = hex;
+    addLog('hex', 'READ ' + shortUuid(char.uuid) + ': ' + hex + ' (' + formatDecoded(val) + ')');
+  } catch (e) {
+    valueEl.textContent = 'Error';
+    addLog('error', 'READ failed ' + shortUuid(char.uuid) + ': ' + e.message);
+  }
+}
+
+async function subscribeCharacteristic(char, valueEl, btn) {
+  var uuid = char.uuid;
+
+  if (subscribedChars.has(uuid)) {
+    // Unsubscribe
+    var entry = subscribedChars.get(uuid);
+    try {
+      await char.stopNotifications();
+    } catch (e) { /* ignore */ }
+    char.removeEventListener('characteristicvaluechanged', entry.handler);
+    subscribedChars.delete(uuid);
+    btn.textContent = 'Subscribe';
+    btn.className = 'btn-secondary';
+    addLog('info', 'Unsubscribed from ' + shortUuid(uuid));
+    return;
+  }
+
+  try {
+    var handler = function(event) {
+      var val = event.target.value;
+      var hex = bufToHex(val.buffer);
+      valueEl.textContent = hex;
+
+      var decoded = decodeTemperature(val);
+      if (decoded !== null) {
+        processReading(decoded, val);
+      }
+
+      addLog('hex', 'NOTIFY ' + shortUuid(uuid) + ': ' + hex + ' (' + formatDecoded(val) + ')');
+    };
+
+    char.addEventListener('characteristicvaluechanged', handler);
+    subscribedChars.set(uuid, { char: char, handler: handler });
+    await char.startNotifications();
+    btn.textContent = 'Unsub';
+    btn.className = 'btn-danger';
+    addLog('info', 'Subscribed to ' + shortUuid(uuid));
+  } catch (e) {
+    addLog('error', 'Subscribe failed ' + shortUuid(uuid) + ': ' + e.message);
+  }
+}
+
+// ── Data decoding ──────────────────────────────────────────────────
+function decodeTemperature(dataView) {
+  try {
+    var le = settings.endian === 'little';
+
+    if (settings.dataType === 'ascii') {
+      // CXL001 sends ASCII like "d28.1" — strip non-numeric prefix, parse float
+      var bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+      var str = '';
+      for (var i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+      // Strip any leading non-numeric, non-minus, non-dot characters
+      var numStr = str.replace(/^[^0-9.\-]+/, '');
+      var temp = parseFloat(numStr);
+      if (isNaN(temp)) return null;
+      return temp + settings.offset;
+    }
+
+    if (settings.dataType === 'int16') {
+      if (dataView.byteLength < 2) return null;
+      var raw = dataView.getInt16(0, le);
+      return (raw / settings.scale) + settings.offset;
+    } else if (settings.dataType === 'uint16') {
+      if (dataView.byteLength < 2) return null;
+      var raw = dataView.getUint16(0, le);
+      return (raw / settings.scale) + settings.offset;
+    } else if (settings.dataType === 'int16multi') {
+      var count = Math.floor(dataView.byteLength / 2);
+      if (count < 1) return null;
+      var temps = [];
+      for (var i = 0; i < count; i++) {
+        var raw = dataView.getInt16(i * 2, le);
+        temps.push((raw / settings.scale) + settings.offset);
+      }
+      addLog('decoded', 'Multi-probe: ' + temps.map(function(t) { return t.toFixed(1) + '\u00B0C'; }).join(', '));
+      return temps[0];
+    }
+  } catch (e) {
+    return null;
+  }
+}
+
+function formatDecoded(dataView) {
+  var parts = [];
+  var le = settings.endian === 'little';
+
+  try {
+    // Always show ASCII interpretation
+    var bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+    var ascii = '';
+    for (var i = 0; i < bytes.length; i++) {
+      var c = bytes[i];
+      ascii += (c >= 32 && c <= 126) ? String.fromCharCode(c) : '.';
+    }
+    parts.push('ascii="' + ascii + '"');
+
+    if (dataView.byteLength >= 2) {
+      var i16le = dataView.getInt16(0, true);
+      var i16be = dataView.getInt16(0, false);
+      parts.push('i16LE=' + i16le);
+      parts.push('i16BE=' + i16be);
+    }
+  } catch (e) { /* ignore decode errors */ }
+
+  return parts.join(' | ');
+}
+
+// ── Temperature processing ─────────────────────────────────────────
+function processReading(tempC, dataView) {
+  var now = Date.now();
+  if (!startTime) startTime = now;
+
+  // EMA smoothing
+  if (smoothedTemp === null) {
+    smoothedTemp = tempC;
+  } else {
+    smoothedTemp = settings.alpha * tempC + (1 - settings.alpha) * smoothedTemp;
+  }
+
+  if (tempC > peakTemp) peakTemp = tempC;
+
+  var rawVal;
+  if (dataView.byteLength >= 2) {
+    rawVal = dataView.getInt16(0, settings.endian === 'little');
+  } else {
+    rawVal = dataView.getUint8(0);
+  }
+
+  readings.push({ ts: now, raw: rawVal, tempC: tempC, smoothedC: smoothedTemp });
+
+  // Chart
+  chartPoints.push({ ts: now, temp: smoothedTemp });
+  if (chartPoints.length > MAX_CHART_POINTS) chartPoints.shift();
+
+  // Update UI
+  updateLiveDisplay();
+  drawChart();
+}
+
+function displayTemp(tempC) {
+  if (settings.unit === 'F') return (tempC * 9 / 5 + 32).toFixed(1);
+  return tempC.toFixed(1);
+}
+
+function unitSymbol() {
+  return settings.unit === 'F' ? '\u00B0F' : '\u00B0C';
+}
+
+function tempColor(tempC) {
+  if (tempC < 20) return 'var(--blue)';
+  if (tempC < 40) return 'var(--text)';
+  if (tempC < 70) return 'var(--accent)';
+  return 'var(--red)';
+}
+
+function updateLiveDisplay() {
+  if (smoothedTemp === null) return;
+
+  var valEl = document.getElementById('tempValue');
+  valEl.textContent = displayTemp(smoothedTemp);
+  valEl.style.color = tempColor(smoothedTemp);
+
+  // Rate of change (over last 60s)
+  var rateEl = document.getElementById('tempRate');
+  var rateMetric = document.getElementById('metricRate');
+  var now = Date.now();
+  var windowStart = now - 60000;
+  var recent = readings.filter(function(r) { return r.ts >= windowStart; });
+
+  if (recent.length >= 2) {
+    var first = recent[0];
+    var last = recent[recent.length - 1];
+    var dtMin = (last.ts - first.ts) / 60000;
+    if (dtMin > 0) {
+      var rate = (last.smoothedC - first.smoothedC) / dtMin;
+      var arrow = rate > 0.1 ? '\u2191' : rate < -0.1 ? '\u2193' : '\u2192';
+      var rateClass = rate > 0.1 ? 'rising' : rate < -0.1 ? 'falling' : '';
+      rateEl.textContent = arrow + ' ' + Math.abs(rate).toFixed(1) + ' ' + unitSymbol() + '/min';
+      rateEl.className = 'temp-rate ' + rateClass;
+      rateMetric.textContent = (rate >= 0 ? '+' : '') + rate.toFixed(1) + '/min';
+    }
+  }
+
+  document.getElementById('metricPeak').textContent = displayTemp(peakTemp) + unitSymbol();
+  document.getElementById('metricCount').textContent = readings.length.toLocaleString();
+
+  if (startTime) {
+    var elapsed = Math.floor((now - startTime) / 1000);
+    var min = Math.floor(elapsed / 60);
+    var sec = elapsed % 60;
+    document.getElementById('metricDuration').textContent = min + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+}
+
+// ── Chart ──────────────────────────────────────────────────────────
+function drawChart() {
+  var canvas = document.getElementById('tempChart');
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+
+  canvas.width = canvas.clientWidth * dpr;
+  canvas.height = canvas.clientHeight * dpr;
+  ctx.scale(dpr, dpr);
+
+  var w = canvas.clientWidth;
+  var h = canvas.clientHeight;
+  var pad = { top: 10, right: 10, bottom: 24, left: 45 };
+  var plotW = w - pad.left - pad.right;
+  var plotH = h - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, w, h);
+
+  if (chartPoints.length < 2) return;
+
+  // Compute ranges
+  var temps = chartPoints.map(function(p) { return p.temp; });
+  var minT = Math.floor(Math.min.apply(null, temps) - 2);
+  var maxT = Math.ceil(Math.max.apply(null, temps) + 2);
+  if (maxT - minT < 5) { minT -= 2; maxT += 2; }
+
+  var minTime = chartPoints[0].ts;
+  var maxTime = chartPoints[chartPoints.length - 1].ts;
+  var timeRange = Math.max(maxTime - minTime, 1000);
+
+  function xScale(ts) { return pad.left + ((ts - minTime) / timeRange) * plotW; }
+  function yScale(t) { return pad.top + plotH - ((t - minT) / (maxT - minT)) * plotH; }
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  var tempStep = Math.ceil((maxT - minT) / 5);
+  if (tempStep < 1) tempStep = 1;
+  for (var t = Math.ceil(minT / tempStep) * tempStep; t <= maxT; t += tempStep) {
+    var y = yScale(t);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText(t + '\u00B0', pad.left - 6, y + 3);
+  }
+
+  // Time labels
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'center';
+  var elapsedSec = (maxTime - minTime) / 1000;
+  if (elapsedSec > 0) {
+    ctx.fillText(formatElapsed(0), xScale(minTime), h - 4);
+    ctx.fillText(formatElapsed(elapsedSec), xScale(maxTime), h - 4);
+    if (elapsedSec > 120) {
+      var mid = minTime + (maxTime - minTime) / 2;
+      ctx.fillText(formatElapsed(elapsedSec / 2), xScale(mid), h - 4);
+    }
+  }
+
+  // Temperature line
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (var i = 0; i < chartPoints.length; i++) {
+    var x = xScale(chartPoints[i].ts);
+    var yy = yScale(chartPoints[i].temp);
+    if (i === 0) ctx.moveTo(x, yy);
+    else ctx.lineTo(x, yy);
+  }
+  ctx.stroke();
+
+  // Gradient fill
+  var gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + plotH);
+  gradient.addColorStop(0, 'rgba(245, 158, 11, 0.2)');
+  gradient.addColorStop(1, 'rgba(245, 158, 11, 0)');
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  for (var i = 0; i < chartPoints.length; i++) {
+    var x = xScale(chartPoints[i].ts);
+    var yy = yScale(chartPoints[i].temp);
+    if (i === 0) ctx.moveTo(x, yy);
+    else ctx.lineTo(x, yy);
+  }
+  ctx.lineTo(xScale(maxTime), pad.top + plotH);
+  ctx.lineTo(xScale(minTime), pad.top + plotH);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function formatElapsed(seconds) {
+  var m = Math.floor(seconds / 60);
+  var s = Math.round(seconds % 60);
+  if (m === 0) return s + 's';
+  return m + 'm' + (s > 0 ? s + 's' : '');
+}
+
+function clearChart() {
+  chartPoints = [];
+  readings = [];
+  smoothedTemp = null;
+  peakTemp = -Infinity;
+  startTime = null;
+  document.getElementById('tempValue').textContent = '--.-';
+  document.getElementById('tempValue').style.color = '';
+  document.getElementById('tempRate').textContent = '';
+  document.getElementById('metricPeak').textContent = '--';
+  document.getElementById('metricRate').textContent = '--';
+  document.getElementById('metricCount').textContent = '0';
+  document.getElementById('metricDuration').textContent = '0:00';
+  var canvas = document.getElementById('tempChart');
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// ── Logging ────────────────────────────────────────────────────────
+function addLog(type, msg) {
+  var ts = new Date().toISOString().slice(11, 23);
+  logLines.push({ ts: ts, type: type, msg: msg });
+
+  var container = document.getElementById('logOutput');
+  if (logLines.length === 1 && container.textContent === 'Waiting for data...') {
+    while (container.firstChild) container.removeChild(container.firstChild);
+  }
+
+  var line = document.createElement('div');
+  line.className = 'log-line';
+
+  var tsSpan = document.createElement('span');
+  tsSpan.className = 'ts';
+  tsSpan.textContent = ts + ' ';
+
+  var msgSpan = document.createElement('span');
+  msgSpan.className = type;
+  msgSpan.textContent = msg;
+
+  line.appendChild(tsSpan);
+  line.appendChild(msgSpan);
+  container.appendChild(line);
+  container.scrollTop = container.scrollHeight;
+
+  // Cap at 2000 lines in DOM
+  while (container.children.length > 2000) {
+    container.removeChild(container.firstChild);
+  }
+}
+
+function clearLog() {
+  logLines = [];
+  var container = document.getElementById('logOutput');
+  while (container.firstChild) container.removeChild(container.firstChild);
+  container.textContent = 'Log cleared.';
+}
+
+function exportLog() {
+  if (readings.length === 0) {
+    addLog('info', 'No readings to export.');
+    return;
+  }
+
+  var csv = 'timestamp_ms,timestamp_iso,raw_value,temp_c,smoothed_c\n';
+  for (var i = 0; i < readings.length; i++) {
+    var r = readings[i];
+    csv += r.ts + ',' + new Date(r.ts).toISOString() + ',' + r.raw + ',' + r.tempC.toFixed(2) + ',' + r.smoothedC.toFixed(2) + '\n';
+  }
+
+  var blob = new Blob([csv], { type: 'text/csv' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'perfectemp_' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  addLog('info', 'Exported ' + readings.length + ' readings as CSV.');
+}
+
+// ── Utilities ──────────────────────────────────────────────────────
+function bufToHex(buffer) {
+  var bytes = new Uint8Array(buffer);
+  var hex = [];
+  for (var i = 0; i < bytes.length; i++) {
+    hex.push(bytes[i].toString(16).padStart(2, '0'));
+  }
+  return hex.join(' ');
+}
+
+function shortUuid(uuid) {
+  // Show the short form for standard 128-bit BLE UUIDs
+  if (uuid.endsWith('-0000-1000-8000-00805f9b34fb')) {
+    return '0x' + uuid.slice(4, 8).toUpperCase();
+  }
+  return uuid;
+}
+
+function propsList(props) {
+  var flags = [];
+  if (props.read) flags.push('READ');
+  if (props.write) flags.push('WRITE');
+  if (props.writeWithoutResponse) flags.push('WRITE_NR');
+  if (props.notify) flags.push('NOTIFY');
+  if (props.indicate) flags.push('INDICATE');
+  if (props.broadcast) flags.push('BROADCAST');
+  return flags.join(', ');
+}
+
+// ── Init ───────────────────────────────────────────────────────────
+loadSettings();
+
+window.addEventListener('resize', function() {
+  if (chartPoints.length > 0) drawChart();
+});
+</script>
+
+</body>
+</html>
